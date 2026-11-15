@@ -63,16 +63,40 @@ function drawShell() {
 }
 
 // Numbers on menu items (unread alerts, pending requests ...). Call after anything that changes them.
-async function refreshBadges() {
+// Also runs by itself every CHECK_EVERY ms (see below), so new alerts appear without a page refresh.
+let lastCounts = {};                               // label → number shown last time
+async function refreshBadges({ announce = false } = {}) {
   if (!state.me) return;
   const items = NAV[state.me.role];
+  const grew = [];
   for (let i = 0; i < items.length; i++) {
     if (!items[i].badge) continue;
-    const n = await items[i].badge();
+    const n = Number(await items[i].badge()) || 0;
     const el = $(`#nav [data-nav="${i}"] .badge`);
     if (el) { el.hidden = !n; el.textContent = n; }
+    if (n > (lastCounts[items[i].label] ?? n)) grew.push(items[i]);
+    lastCounts[items[i].label] = n;
   }
+  if (!announce || !grew.length) return;
+  const current = location.hash.replace(/^#\/?/, '').split('/')[0];
+  // Already reading the Alerts screen: redraw it with the new alert. (Other screens are not redrawn,
+  // so an admin half-way through typing a rejection reason doesn't lose it — they get a message instead.)
+  if (grew.some((item) => item.label === 'Alerts' && item.routes.includes(current))) { await router(); return; }
+  toast(grew[0].label === 'Alerts' ? 'You have a new alert.' : `New item in ${grew[0].label}.`);
 }
+
+// Check for new alerts / requests every 20 seconds while the tab is open and visible,
+// and straight away when the person comes back to the tab.
+const CHECK_EVERY = 20000;
+let checking = false;
+async function checkForNews() {
+  if (checking || !state.me || document.hidden) return;
+  checking = true;
+  try { await refreshBadges({ announce: true }); } catch { /* offline for a moment: try again next time */ }
+  checking = false;
+}
+setInterval(checkForNews, CHECK_EVERY);
+document.addEventListener('visibilitychange', checkForNews);
 
 // ---------- show the screen for the current address ----------
 async function router() {
@@ -118,6 +142,7 @@ async function startSession() {
   } catch (err) {
     state.me = null; drawShell(); showProblem(err); return;
   }
+  lastCounts = {};
   drawShell();
   refreshBadges().catch(() => {});                 // a missing badge number is not worth an error
   await router();
