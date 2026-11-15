@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClassCast</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="guest">
+  <!-- Phone only: brand + log out (the sidebar becomes a bottom bar on phones) -->
+  <header class="topbar">
+    <span class="topbar-brand">ClassCast</span>
+    <button type="button" class="topbar-out" data-logout>Log out</button>
+  </header>
+
+  <div class="shell">
+    <aside class="side">
+      <a class="brand" href="#/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg>
+        </span>
+        ClassCast
+      </a>
+      <nav class="nav" id="nav" aria-label="Main"></nav>   <!-- links are drawn by router.js for the user's role -->
+      <div class="me" id="me"></div>
+    </aside>
+
+    <main id="view" tabindex="-1"></main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- Shared code -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="js/firebase-config.js"></script>   <!-- server address + Firebase project -->
+  <script src="js/api.js"></script>    <!-- data layer: calls the FastAPI backend -->
+  <script src="js/core.js"></script>   <!-- helpers used by every module -->
+
+  <!-- Login page -->
+  <script src="js/modules/auth/login.js"></script>
+
+  <!-- Course rep UI: one file per feature -->
+  <script src="js/modules/rep/1-lecture-theatres.js"></script>
+  <script src="js/modules/rep/1-student-features.js"></script>
+  <script src="js/modules/rep/2-request-reservation.js"></script>
+  <script src="js/modules/rep/3-reservation-history.js"></script>
+  <script src="js/modules/rep/4-approval-status.js"></script>
+  <script src="js/modules/rep/5-timetable-changes.js"></script>
+  <script src="js/modules/rep/6-availability-corrections.js"></script>
+
+  <!-- Administrator UI: one file per feature -->
+  <script src="js/modules/admin/1-accounts.js"></script>
+  <script src="js/modules/admin/2-classrooms.js"></script>
+  <script src="js/modules/admin/3-buildings-facilities.js"></script>
+  <script src="js/modules/admin/4-timetable.js"></script>
+  <script src="js/modules/admin/5-reservation-approvals.js"></script>
+  <script src="js/modules/admin/6-verify-reports.js"></script>
+  <script src="js/modules/admin/7-monitoring.js"></script>
+
+  <script src="js/router.js"></script>  <!-- must be last: decides which UI to show and starts the app -->
+</body>
+</html>
