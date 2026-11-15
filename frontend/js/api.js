@@ -14,6 +14,15 @@ const API = (() => {
   const CONFIG = window.CLASSCAST_CONFIG || {};
   const BASE = (CONFIG.apiBase || 'http://127.0.0.1:8000').replace(/\/$/, '');
 
+  // The free Render server sleeps after ~15 minutes without visitors and needs 30–60 seconds to wake.
+  // Knock once as soon as the page opens, so it is usually awake by the time someone logs in.
+  fetch(BASE + '/api/health').catch(() => {});
+  // How long a request keeps retrying while the server wakes up (not on this laptop: there a
+  // stopped server should be reported straight away).
+  const LOCAL = /^http:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(BASE);
+  const WAKE_WAIT = LOCAL ? 0 : 75000;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
   // ---------- date helpers (used by the screens) ----------
   const pad = (n) => String(n).padStart(2, '0');
   const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -56,15 +65,28 @@ const API = (() => {
     const url = new URL(BASE + path);
     Object.entries(query || {}).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v); });
 
+    // While the server is waking up the request fails (no answer, or 502/503 from Render).
+    // Such a request never reached ClassCast, so it is safe to send it again.
+    const giveUpAt = Date.now() + WAKE_WAIT;
     let response;
-    try {
-      response = await fetch(url, {
-        method,
-        headers: { Authorization: `Bearer ${await user.getIdToken()}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-    } catch {
-      throw new Error(`Cannot reach the ClassCast server at ${BASE}. Is it running?`);
+    for (;;) {
+      try {
+        response = await fetch(url, {
+          method,
+          headers: { Authorization: `Bearer ${await user.getIdToken()}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (![502, 503, 504].includes(response.status) || LOCAL) break;
+      } catch {
+        response = null;
+      }
+      if (Date.now() >= giveUpAt) break;
+      await sleep(3000);
+    }
+    if (!response || (!LOCAL && [502, 503, 504].includes(response.status))) {
+      throw new Error(LOCAL
+        ? `Cannot reach the ClassCast server at ${BASE}. Is it running?`
+        : 'The ClassCast server is still starting up (this takes up to a minute after a quiet spell). Please try again in a moment, and check your internet connection.');
     }
     if (response.status === 204) return undefined;
     const data = await response.json().catch(() => null);
