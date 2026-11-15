@@ -26,6 +26,7 @@ Screens.login = async function loginView() {
           <label>Email<input type="email" name="email" autocomplete="username" required></label>
           <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
           <p id="error" class="error" role="alert" hidden></p>
+          <p id="waking" class="muted small" aria-live="polite" hidden>Starting the server. After a quiet spell this can take up to a minute…</p>
           <button type="submit" class="btn primary" id="submit">Log in</button>
         </form>
       </section>
@@ -41,6 +42,8 @@ Screens.login = async function loginView() {
     if (!password) return showError('Enter your password.');
 
     $('#submit').disabled = true;
+    // A normal login takes a second or two; if it is slower, the server is probably waking up
+    const slow = setTimeout(() => { const w = $('#waking'); if (w) w.hidden = false; }, 4000);
     try {
       await API.login(email, password);
       history.replaceState(null, '', '#/');      // router.js picks the home screen for the role
@@ -48,6 +51,9 @@ Screens.login = async function loginView() {
     } catch (err) {
       showError(err.message);
       const btn = $('#submit'); if (btn) btn.disabled = false;
+    } finally {
+      clearTimeout(slow);
+      const w = $('#waking'); if (w) w.hidden = true;
     }
   });
 };
