@@ -87,6 +87,12 @@ textarea { resize: vertical; }
 .form { display: flex; flex-direction: column; gap: 16px; max-width: 640px; padding: 26px; }
 .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
 label.inline { flex-direction: row; align-items: center; gap: 8px; }
+/* reservation slots (one per hall/time in a request) */
+.booking-slots { display: flex; flex-direction: column; gap: 14px; }
+.booking-slot { display: flex; flex-direction: column; gap: 14px; padding: 16px; border: 1.5px solid var(--line); border-radius: var(--r-ctl); }
+.booking-slot.clash { border-color: var(--busy); }
+.booking-slot-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; font-weight: 700; }
+.form .add-slot { align-self: flex-start; }
 label.inline input { width: auto; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 20px; border-radius: var(--r-ctl); border: 1.5px solid #A5B0C4; background: #fff; color: var(--ink); font: 600 15px var(--body); text-decoration: none; cursor: pointer; }
