@@ -157,6 +157,8 @@ const API = (() => {
     checkClash: (classroomId, date, start, end) => get('/api/reservations/check-clash', { classroom_id: classroomId, date, start, end }),
 
     createReservation: (data) => post('/api/reservations', data),
+    // Several at once (up to 20). All are booked or none; errors start "Booking 2: ..."
+    createReservations: (list) => post('/api/reservations/batch', { reservations: list }),
     listMyReservations: () => get('/api/reservations/mine'),
     cancelReservation: (reservationId) => patch(`/api/reservations/${id(reservationId)}/cancel`),
 
