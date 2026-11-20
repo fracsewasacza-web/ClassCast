@@ -20,6 +20,11 @@ class ReservationIn(BaseModel):
     expected_attendance: int = Field(gt=0)
 
 
+class ReservationBatchIn(BaseModel):
+    """Several bookings sent together. All are saved, or none are."""
+    reservations: list[ReservationIn] = Field(min_length=1, max_length=20)
+
+
 class ReviewIn(BaseModel):
     decision: Literal["approved", "rejected"]
     reason: str | None = Field(default=None, max_length=255)

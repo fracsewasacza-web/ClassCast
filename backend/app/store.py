@@ -127,9 +127,10 @@ class FirestoreStore:
         self.forget(collection)
 
     # ---------- one at a time ----------
-    def locked(self, key: str, work):
+    def locked(self, key: str | list[str], work):
         """
         Run work(writes) so that only ONE request with the same key runs at a time.
+        Pass a list of keys to hold several at once (e.g. booking several rooms together).
 
         This is what stops double-booking. Two reps booking the same room on the
         same day both use the key "<room>_<date>". Firestore lets the first one
@@ -140,13 +141,16 @@ class FirestoreStore:
         object it is given, so everything is saved together or not at all.
         If work() raises an error, nothing is saved.
         """
-        lock_ref = self.client.collection("locks").document(key)
+        keys = sorted({key} if isinstance(key, str) else set(key))   # same order every time: no deadlocks
+        lock_refs = [self.client.collection("locks").document(k) for k in keys]
 
         @firestore.transactional
         def run(transaction):
-            lock_ref.get(transaction=transaction)                 # take the lock
+            for ref in lock_refs:
+                ref.get(transaction=transaction)                  # take the locks
             result = work(_Writes(self.client, transaction))
-            transaction.set(lock_ref, {"updated_at": now_iso()})  # release it, changed
+            for ref in lock_refs:
+                transaction.set(ref, {"updated_at": now_iso()})   # release them, changed
             return result
 
         return run(self.client.transaction())
