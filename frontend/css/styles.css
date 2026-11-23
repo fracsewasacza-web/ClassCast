@@ -211,7 +211,10 @@ fieldset.types legend { font-size: 13px; font-weight: 600; color: var(--muted); 
 body.guest .side, body.guest .topbar { display: none; }
 body.guest main { max-width: none; padding: 0; }
 .login { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
-.login-art { background: var(--cobalt); color: #fff; padding: 48px 56px; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; }
+/* The NLT building behind a cobalt wash: the photo is small (518 px wide), so the wash is strong
+   enough that its softness doesn't show and the white text stays easy to read */
+.login-art { background: linear-gradient(165deg, rgba(27, 63, 168, .93) 0%, rgba(27, 63, 168, .80) 50%, rgba(20, 47, 128, .94) 100%),
+    url('../img/nlt-entrance.jpg') left center / cover no-repeat, var(--cobalt); color: #fff;   /* left: the glass entrance is on that side */ padding: 48px 56px; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; }
 .login-brand { font: 700 26px/1 var(--display); letter-spacing: -0.5px; }
 .login-art h1 { font-size: 64px; letter-spacing: -2px; max-width: 11ch; margin-bottom: 18px; }
 .login-sub { font-size: 18px; color: #D6DFF8; max-width: 38ch; }
