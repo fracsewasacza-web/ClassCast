@@ -56,7 +56,7 @@ const API = (() => {
   };
 
   // ---------- one request to the server ----------
-  async function call(method, path, { query, body } = {}) {
+  async function call(method, path, { query, body, timeout } = {}) {
     if (setupError) throw setupError;
     await ready;
     const user = auth.currentUser;
@@ -70,15 +70,22 @@ const API = (() => {
     const giveUpAt = Date.now() + WAKE_WAIT;
     let response;
     for (;;) {
+      // A request that hangs (server stuck, bad connection) is abandoned after a while and
+      // counted as "no answer", so the page shows a message instead of waiting forever.
+      const stop = new AbortController();
+      const timer = setTimeout(() => stop.abort(), timeout || (LOCAL ? 10000 : 25000));
       try {
         response = await fetch(url, {
           method,
           headers: { Authorization: `Bearer ${await user.getIdToken()}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
           body: body ? JSON.stringify(body) : undefined,
+          signal: stop.signal,
         });
         if (![502, 503, 504].includes(response.status) || LOCAL) break;
       } catch {
         response = null;
+      } finally {
+        clearTimeout(timer);
       }
       if (Date.now() >= giveUpAt) break;
       await sleep(3000);
@@ -106,6 +113,20 @@ const API = (() => {
   const patch = (path, body) => call('PATCH', path, { body });
   const del = (path) => call('DELETE', path);
   const id = (x) => encodeURIComponent(x);
+
+  // A photo from a phone can be 4000 px and 5 MB. Redraw it at most `longest` px on its long side,
+  // as JPEG, and return it the way the server wants it: { media_type, data } with data in base64.
+  async function shrinkImage(file, longest) {
+    const bitmap = await createImageBitmap(file).catch(() => { throw new Error('That image could not be opened.'); });
+    const scale = Math.min(1, longest / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);     // transparent PNGs get a white page
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const data = canvas.toDataURL('image/jpeg', 0.88).split(',')[1];
+    return { media_type: 'image/jpeg', data };
+  }
 
   // The room page links to Google Maps; the server does not store map links
   const withMap = (b) => b && ({ ...b, map_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${b.name}, University of Cape Coast`)}` });
@@ -243,7 +264,17 @@ const API = (() => {
       return d.id ? put(`/api/admin/timetable/${id(d.id)}`, body) : post('/api/admin/timetable', body);
     },
     deleteTimetableEntry: (entryId) => del(`/api/admin/timetable/${id(entryId)}`),
-    importTimetable: ({ rows, replace }) => post('/api/admin/timetable/import', { rows, replace: Boolean(replace) }),
+    importTimetable: ({ rows, replace, file_name, source }) =>
+      post('/api/admin/timetable/import', { rows, replace: Boolean(replace), file_name: file_name || '', source: source || 'csv' }),
+    listTimetableImports: () => get('/api/admin/timetable/imports'),
+    deleteTimetableImport: (importId) => del(`/api/admin/timetable/imports/${id(importId)}`),
+    // Claude reads a timetable photo into rows for the admin to check. Nothing is saved yet.
+    // The photo is shrunk in the browser first (smaller upload, and within Claude's image limits).
+    readTimetableImage: async (file) => {
+      if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) throw new Error('Choose a JPG, PNG or WebP image.');
+      const image = await shrinkImage(file, 2000);
+      return call('POST', '/api/admin/timetable/read-image', { body: image, timeout: 180000 });
+    },
 
     // ================= ADMIN 5: reservation requests =================
     listAllReservations: () => get('/api/admin/reservations'),
