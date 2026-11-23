@@ -222,6 +222,9 @@ body.guest main { max-width: none; padding: 0; }
 .login-form { display: flex; flex-direction: column; gap: 16px; }
 .login-form h2 { font: 700 40px/1.05 var(--display); letter-spacing: -1px; margin-bottom: 6px; }
 .login-form .btn { min-height: 50px; }
+.login-form p.lead { font-size: 15px; color: var(--muted); margin-top: -8px; }
+.link-btn { align-self: flex-start; padding: 4px 0; border: 0; background: none; color: var(--cobalt); font: 600 14px var(--body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.link-btn:hover { color: var(--cobalt-deep); }
 .demo { padding: 16px; border: 1.5px dashed #AEB8C9; border-radius: var(--r-card); display: flex; flex-direction: column; gap: 12px; font-size: 14px; color: var(--muted); }
 .demo strong { color: var(--ink); }
 
