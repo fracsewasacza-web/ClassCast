@@ -134,6 +134,27 @@ const API = (() => {
     },
     logout: async () => { if (auth) await auth.signOut(); },
 
+    // Change my own password. Firebase asks for the current one again first, so someone
+    // using a computer the rep left signed in cannot take over the account.
+    changePassword: async (current, next) => {
+      if (setupError) throw setupError;
+      await ready;
+      const user = auth.currentUser;
+      if (!user) throw new Error('Log in first.');
+      try {
+        await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, current));
+      } catch (err) {
+        const wrong = ['auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/wrong-password'].includes(err.code);
+        throw new Error(wrong ? 'Your current password is wrong.' : FIREBASE_ERRORS[err.code] || err.message);
+      }
+      try {
+        await user.updatePassword(next);
+      } catch (err) {
+        throw new Error(err.code === 'auth/weak-password' ? 'Firebase refused that password as too weak. Choose a longer one.'
+          : FIREBASE_ERRORS[err.code] || err.message);
+      }
+    },
+
     // GET /api/me   (null when nobody is signed in, or the login has no usable account)
     getMe: async () => {
       if (setupError) return null;
