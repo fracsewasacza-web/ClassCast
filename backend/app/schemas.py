@@ -104,3 +104,11 @@ class ImportRow(BaseModel):
 class ImportIn(BaseModel):
     rows: list[ImportRow] = Field(max_length=2000)
     replace: bool = False
+    file_name: str = Field(default="", max_length=200)          # shown in the upload history
+    source: Literal["csv", "image"] = "csv"
+
+
+class TimetableImageIn(BaseModel):
+    """A photo or screenshot of a timetable, as base64 text (the browser shrinks it first)."""
+    media_type: Literal["image/jpeg", "image/png", "image/webp", "image/gif"]
+    data: str = Field(min_length=100, max_length=7_000_000)      # about 5 MB of image
