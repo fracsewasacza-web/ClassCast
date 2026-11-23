@@ -116,6 +116,7 @@ classcast-backend/
 | GET | `/api/rooms/{room_id}/schedule` | signed in | One room's timetable for a date |
 | GET | `/api/reservations/check-clash` | signed in | What is in a room during a slot |
 | POST | `/api/reservations` | course rep | Request a room (clash checked) |
+| POST | `/api/reservations/batch` | course rep | Request up to 20 rooms/slots at once — all saved or none |
 | GET | `/api/reservations/mine` | course rep | My requests |
 | PATCH | `/api/reservations/{id}/cancel` | course rep | Cancel my request |
 | GET | `/api/timetable/mine` | course rep | Weekly classes of my courses |
@@ -137,7 +138,10 @@ classcast-backend/
 | PUT, DELETE | `/api/admin/facilities/{id}` | admin | Rename / remove (taken off every room) |
 | GET, POST | `/api/admin/timetable` | admin | The weekly timetable / add a class |
 | PUT, DELETE | `/api/admin/timetable/{id}` | admin | Edit / remove a class |
-| POST | `/api/admin/timetable/import` | admin | Upload CSV rows (add to, or replace, the timetable) |
+| POST | `/api/admin/timetable/import` | admin | Upload CSV rows, or rows checked after reading a photo (add to, or replace, the timetable) |
+| GET | `/api/admin/timetable/imports` | admin | Upload history, newest first, with how many of each upload's classes are still on |
+| DELETE | `/api/admin/timetable/imports/{id}` | admin | Take every class from one upload off the timetable |
+| POST | `/api/admin/timetable/read-image` | admin | Claude reads a timetable photo into rows to check; saves nothing. Needs `ANTHROPIC_API_KEY` |
 | GET | `/api/admin/pending-counts` | admin | Numbers on the Requests and Reports badges |
 | GET | `/api/admin/overview` | admin | Counts, hours in use, recent activity |
 
