@@ -4,7 +4,10 @@ ADMIN MODULE 4 — the official weekly timetable.
     POST   /api/admin/timetable
     PUT    /api/admin/timetable/{entry_id}
     DELETE /api/admin/timetable/{entry_id}
-    POST   /api/admin/timetable/import     (rows already read from a CSV file by the browser)
+    POST   /api/admin/timetable/import     (rows already read from a CSV file or an image)
+    GET    /api/admin/timetable/imports    (the upload history)
+    DELETE /api/admin/timetable/imports/{import_id}   (take one upload's classes off again)
+    POST   /api/admin/timetable/read-image (Claude reads a timetable photo into rows to check)
 """
 import re
 
@@ -12,8 +15,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app import store
 from app.auth import require_role
-from app.schemas import ImportIn, TimetableIn
-from app.services import records, schedule
+from app.schemas import ImportIn, TimetableImageIn, TimetableIn
+from app.services import records, schedule, timetable_reader
 
 router = APIRouter(prefix="/admin", tags=["Timetable (admin)"])
 admin = require_role("admin")
@@ -137,6 +140,7 @@ def import_timetable(body: ImportIn, user: dict = Depends(admin)) -> dict:
         staged.append({"id": None, "course_id": course["id"], "classroom_id": room["id"], "day_of_week": day,
                        "start_time": start, "end_time": end, "lecturer_name": row.lecturer.strip() or None})
 
+    import_id = None
     if staged:
         if body.replace:
             for t in store.db.all("timetable"):
@@ -145,10 +149,61 @@ def import_timetable(body: ImportIn, user: dict = Depends(admin)) -> dict:
                 store.db.delete("session_overrides", o["id"])
         for c in new_courses.values():
             store.db.set("courses", c["id"], {"code": c["code"], "title": c["title"]})
+        # One record per upload, so the administrator can see it later and take it back off
+        name = body.file_name.strip() or ("Timetable photo" if body.source == "image" else "Timetable file")
+        import_id = store.db.add("timetable_imports", {
+            "file_name": name, "source": body.source, "replace": body.replace,
+            "imported": len(staged), "skipped": len(skipped),
+            "uploaded_by": user["id"], "uploaded_by_name": user.get("full_name", ""), "created_at": store.now_iso()})
         for t in staged:
-            store.db.add("timetable", {k: v for k, v in t.items() if k != "id"})
+            store.db.add("timetable", {**{k: v for k, v in t.items() if k != "id"}, "import_id": import_id})
         store.db.forget("timetable")
         note = f", {len(skipped)} rows skipped" if skipped else ""
-        records.log(store.db, user, f'Uploaded a timetable: {len(staged)} classes '
+        records.log(store.db, user, f'Uploaded {name}: {len(staged)} classes '
                                     f'{"replaced the old timetable" if body.replace else "added"}{note}')
-    return {"imported": len(staged), "skipped": skipped}
+    return {"imported": len(staged), "skipped": skipped, "import_id": import_id}
+
+
+# ---------- upload history ----------
+@router.get("/timetable/imports")
+def list_imports(user: dict = Depends(admin)) -> list[dict]:
+    """Every upload, newest first, with how many of its classes are still on the timetable."""
+    left: dict[str, int] = {}
+    for t in store.db.all("timetable"):
+        if t.get("import_id"):
+            left[t["import_id"]] = left.get(t["import_id"], 0) + 1
+    rows = [{**i, "classes_now": left.get(i["id"], 0)} for i in store.db.all("timetable_imports")]
+    return sorted(rows, key=lambda i: i["created_at"], reverse=True)
+
+
+@router.delete("/timetable/imports/{import_id}", status_code=204)
+def delete_import(import_id: str, user: dict = Depends(admin)) -> None:
+    """Take every class that came from one upload off the timetable, and forget the upload."""
+    upload = store.db.get("timetable_imports", import_id)
+    if upload is None:
+        raise HTTPException(404, "That upload no longer exists.")
+    removed = store.db.where("timetable", import_id=import_id)
+    gone = {t["id"] for t in removed}
+    for o in store.db.all("session_overrides"):
+        if o.get("timetable_entry_id") in gone:
+            store.db.delete("session_overrides", o["id"])
+    for t in removed:
+        store.db.delete("timetable", t["id"])
+    store.db.delete("timetable_imports", import_id)
+    store.db.forget("timetable")
+    records.log(store.db, user, f'Removed the upload {upload["file_name"]} ({len(removed)} classes)')
+
+
+# ---------- reading a timetable photo ----------
+@router.post("/timetable/read-image")
+def read_timetable_image(body: TimetableImageIn, user: dict = Depends(admin)) -> dict:
+    """
+    Claude reads the photo and returns the classes as rows in the same shape as a
+    CSV upload. Nothing is saved: the administrator checks the rows, then imports them.
+    """
+    rooms = sorted(r["name"] for r in store.db.lookup("classrooms"))
+    try:
+        result = timetable_reader.read(body.data, body.media_type, rooms)
+    except timetable_reader.ReadError as problem:
+        raise HTTPException(problem.status, str(problem))
+    return {"rows": result["rows"], "notes": result["notes"]}
