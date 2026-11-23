@@ -500,11 +500,12 @@ const API = (() => {
     // POST /api/admin/timetable/import
     // rows: [{ course_code, course_title, room, day, start, end, lecturer }]  (already read from the CSV file)
     // Good rows are imported; bad rows are skipped and reported back with the reason.
-    importTimetable: ({ rows, replace }) => call(() => {
+    importTimetable: ({ rows, replace, file_name, source = 'csv' }) => call(() => {
       need('admin');
       const staged = replace ? [] : db.timetable.map((t) => ({ ...t }));
       const newCourses = [], skipped = [];
       let imported = 0, nextId = db.nextId;
+      const importId = nextId++;
       const clock = (v) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(v || '').trim()); return m && Number(m[1]) < 24 && Number(m[2]) < 60 ? `${pad(m[1])}:${m[2]}` : null; };
       const dayNo = (v) => { const s = String(v || '').trim().toLowerCase(); if (/^[1-7]$/.test(s)) return Number(s);
         const i = DAY_NAMES.findIndex((d) => d && s.length >= 3 && d.toLowerCase().startsWith(s)); return i > 0 ? i : null; };
@@ -525,16 +526,48 @@ const API = (() => {
 
         let course = [...db.courses, ...newCourses].find((c) => c.code.toUpperCase() === code);
         if (!course) { course = { id: nextId++, code, title: String(r.course_title || '').trim() || code }; newCourses.push(course); }
-        staged.push({ id: nextId++, course_id: course.id, classroom_id: room.id, day_of_week: day, start_time: start, end_time: end, lecturer_name: String(r.lecturer || '').trim() || null });
+        staged.push({ id: nextId++, course_id: course.id, classroom_id: room.id, day_of_week: day, start_time: start, end_time: end, lecturer_name: String(r.lecturer || '').trim() || null, import_id: importId });
         imported++;
       });
 
       if (imported) {                                              // nothing is changed if every row failed
         db.timetable = staged; db.courses.push(...newCourses); db.nextId = nextId;
         if (replace) db.session_overrides = [];
-        log(`Uploaded a timetable: ${imported} classes ${replace ? 'replaced the old timetable' : 'added'}${skipped.length ? `, ${skipped.length} rows skipped` : ''}`);
+        const name = String(file_name || '').trim() || (source === 'image' ? 'Timetable photo' : 'Timetable file');
+        (db.timetable_imports ||= []).push({ id: importId, file_name: name, source, replace: Boolean(replace), imported, skipped: skipped.length,
+          uploaded_by: db.session, uploaded_by_name: me().full_name, created_at: new Date().toISOString() });
+        log(`Uploaded ${name}: ${imported} classes ${replace ? 'replaced the old timetable' : 'added'}${skipped.length ? `, ${skipped.length} rows skipped` : ''}`);
       }
-      return { imported, skipped };
+      return { imported, skipped, import_id: imported ? importId : null };
+    }),
+
+    // GET /api/admin/timetable/imports   (newest first, with how many of its classes are still on)
+    listTimetableImports: () => call(() => {
+      need('admin');
+      return (db.timetable_imports || []).map((i) => ({ ...i, classes_now: db.timetable.filter((t) => t.import_id === i.id).length }))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }),
+
+    // DELETE /api/admin/timetable/imports/:id
+    deleteTimetableImport: (id) => call(() => {
+      need('admin');
+      const up = (db.timetable_imports || []).find((i) => i.id === Number(id)) || fail('That upload no longer exists.');
+      const gone = db.timetable.filter((t) => t.import_id === up.id).map((t) => t.id);
+      db.timetable = db.timetable.filter((t) => t.import_id !== up.id);
+      db.session_overrides = db.session_overrides.filter((o) => !gone.includes(o.timetable_entry_id));
+      db.timetable_imports = db.timetable_imports.filter((i) => i !== up);
+      log(`Removed the upload ${up.file_name} (${gone.length} classes)`);
+    }),
+
+    // POST /api/admin/timetable/read-image   (real app: Claude reads the photo; the mock returns sample rows)
+    readTimetableImage: (file) => call(() => {
+      need('admin');
+      if (!/^image\//.test(file.type)) fail('Choose an image file (JPG, PNG or WebP).');
+      return { notes: 'Sample data: the mock does not really read images.', rows: [
+        { course_code: 'PHY 202', course_title: 'Electronics', room: 'NLT 6', day: 'Wednesday', start: '08:00', end: '10:00', lecturer: 'Dr. K. Owusu' },
+        { course_code: 'STA 201', course_title: 'Statistics', room: 'CALC 3', day: 'Thursday', start: '13:00', end: '15:00', lecturer: '' },
+        { course_code: 'MAT 204', course_title: 'Linear Algebra', room: 'NLT1', day: 'Friday', start: '10:00', end: '12:00', lecturer: '' },
+      ] };
     }),
 
     // ================= ADMIN 5: reservation requests =================
