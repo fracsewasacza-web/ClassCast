@@ -201,6 +201,10 @@ const API = (() => {
     }),
     // POST /api/auth/logout
     logout: () => call(() => { db.session = null; }),
+    // (real app: Firebase sendPasswordResetEmail; the mock cannot send email)
+    sendPasswordReset: (email) => call(() => {
+      if (!/^\S+@\S+\.\S+$/.test(String(email).trim())) fail('Enter a valid email address.');
+    }),
     // (real app: Firebase reauthenticateWithCredential + updatePassword, no server call)
     changePassword: (current, next) => call(() => {
       const u = me();
