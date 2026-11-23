@@ -20,6 +20,7 @@ const ICONS = {
   door: '<path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M3 21h18M14 12h.01"/>',
   building: '<path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/>',
   users: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/>',
+  key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
 };
 
 // label, address, the screens that count as "this menu item", icon, optional badge number
@@ -31,6 +32,7 @@ const NAV = {
     { label: 'Report change', href: '#/changes', routes: ['changes'], icon: 'calendarX' },
     { label: 'Hall correction', href: '#/corrections', routes: ['corrections'], icon: 'flag' },
     { label: 'Alerts', href: '#/alerts', routes: ['alerts'], icon: 'bell', badge: () => API.unreadCount() },
+    { label: 'Password', href: '#/password', routes: ['password'], icon: 'key' },
   ],
   admin: [
     { label: 'Overview', href: '#/overview', routes: ['overview'], icon: 'chart' },
