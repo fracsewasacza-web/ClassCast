@@ -134,6 +134,18 @@ const API = (() => {
     },
     logout: async () => { if (auth) await auth.signOut(); },
 
+    // "Forgot password?": Firebase emails a link to a page where the person sets a new password.
+    // Firebase does not say whether the email has an account, so nobody can use this to find out.
+    sendPasswordReset: async (email) => {
+      if (setupError) throw setupError;
+      try {
+        await auth.sendPasswordResetEmail(String(email).trim());
+      } catch (err) {
+        if (err.code === 'auth/user-not-found') return;          // same answer as for a real account
+        throw new Error(FIREBASE_ERRORS[err.code] || err.message);
+      }
+    },
+
     // Change my own password. Firebase asks for the current one again first, so someone
     // using a computer the rep left signed in cannot take over the account.
     changePassword: async (current, next) => {
